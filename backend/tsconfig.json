@@ -1,0 +1,20 @@
+{
+    "compilerOptions": {
+      "target": "es6",
+      "module": "commonjs",
+      "outDir": "./dist",
+      "rootDir": "./src",  // Adjusted to point to the current directory
+      "strict": true,
+      "esModuleInterop": true,
+      "skipLibCheck": true,
+      "forceConsistentCasingInFileNames": true
+    },
+    "include": [
+      "src/**/*.ts"  // Includes all TypeScript files in the backend directory and subdirectories
+    ],
+    "exclude": [
+      "node_modules",  // Exclude node_modules by default
+      "./dist"         // Exclude the dist directory
+    ]
+}
+  
