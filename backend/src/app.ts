@@ -1,11 +1,11 @@
 import express from 'express';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
-import routes from '../routes';
+import routes from './routes';
 import jwt from 'jsonwebtoken';
-import { SECRETKEY } from '../utils/auth';
-import { GameManager } from '../game/GameManager';
-import { Player } from '../game/models/Player';
+import { SECRETKEY } from './utils/auth';
+import { GameManager } from './game/GameManager';
+import { Player } from './game/models/Player';
 
 const app = express();
 const PORT = 8080;

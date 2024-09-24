@@ -138,8 +138,4 @@ async function login(user: DbUser, given_password?: string){
     }
 }
 
-
-
-
-
 export default router;

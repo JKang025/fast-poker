@@ -88,7 +88,6 @@ export class Game {
     }
   }
 
-  // In Game.ts
   public handlePlayerAction(playerId: string, actionType: 'fold' | 'call' | 'raise', amount?: number) {
     this.queueAction(async () => {
       const player = this.players.find(p => p.id === playerId);
@@ -198,15 +197,7 @@ export class Game {
       console.log(`${winners[0].username} receives the remaining ${remaining} chips.`);
     }
 
-    await this.saveGameResult();
     this.state = 'FINISHED';
-  }
-
-
-  //TODO
-  private async saveGameResult() {
-    // Connect to MongoDB and save game results
-    // Update user statistics (wins, losses, earnings)
   }
 
   public getGameState() {
@@ -226,6 +217,8 @@ export class Game {
       state: this.state,
     };
   }
+
+
   // handling concurrency
   private actionQueue: Array<() => void> = [];
   private isProcessing: boolean = false;
