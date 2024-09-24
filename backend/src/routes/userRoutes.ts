@@ -11,19 +11,79 @@ const COLLECTIONNAME = "users";
 const SECRETKEY = 'aggag1i32'
 
 
-router.get('/login', (req: Request, res: Response) => {
+router.post('/login', async (req: Request, res: Response) => {
+    try {
+        const { username, password } = req.body;
+        console.log('Request body:', req.body);
+        // Check if username is provided
+        if (!username) {
+            return res.status(400).json({ message: 'Username is required' });
+        }
 
-    const { username } = req.body;
+        // Check if the user exists
+        let { exists, user } = await checkUsername(username);
+        
+        // If the user doesn't exist, create a new one
+        if (!exists) { 
+            const { user : newUser } = await createUser(username);
+            const nonNullUser = newUser as DbUser;
+            if(password){
+                await addPassword(nonNullUser, password)
+            }
+            user = nonNullUser
+        } 
 
-    run().catch(console.dir);
-    res.send('User list');
+        console.log('hehe')
+
+        // login
+        const nonNullUser = user as DbUser;
+        const { success, token }  = await login(nonNullUser, password)
+
+        if (success) {
+            return res.status(200).json({ token });
+        } else {
+            return res.status(401).json({ message: 'Invalid password' });
+        }
+        
+    } catch (error) {
+        console.error('Error during login:', error);
+        return res.status(500).json({ message: 'Internal server error' });
+    }
 });
 
 
-async function run() {
+router.post('/setpassword', async (req: Request, res: Response) => {
+    try {
+        const { username, newPassword } = req.body;
+
+        // Check if username and newPassword are provided
+        if (!username || !newPassword) {
+            return res.status(400).json({ message: 'Username and new password are required' });
+        }
+
+        // Check if the user exists
+        const { exists, user } = await checkUsername(username);
+
+        if (!exists || !user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        // Check if the user already has a password
+        if (user.password) {
+            return res.status(400).json({ message: 'Password is already set for this user' });
+        }
+
+        // Set the new password
+        await addPassword(user, newPassword);
+
+        return res.status(200).json({ message: 'Password set successfully' });
+    } catch (error) {
+        console.error('Error setting password:', error);
+        return res.status(500).json({ message: 'Internal server error' });
+    }
+});
 
 
-}
 
 async function checkUsername(username: string): Promise<{ exists: boolean, user: DbUser | null }> {
     const collection: Collection<DbUser> = await getCollection('users');
@@ -40,48 +100,46 @@ async function createUser(username: string) {
     };
     const result = await collection.insertOne(newUser);
     console.log(`A document was inserted with the _id: ${result.insertedId}`);
+    return {user: newUser}
 }
 
-async function addPassword(user: DbUser){
+async function addPassword(user: DbUser, plainPassword: string){
+    const collection: Collection<DbUser> = await getCollection('users');
 
+    // Hash the password with bcrypt
+    const saltRounds = 10;
+    const hashedPassword = await bcrypt.hash(plainPassword, saltRounds);
+
+    // Updating user in database with password
+    await collection.updateOne(
+        { _id: user._id },  
+        { $set: { password: hashedPassword, updatedAt: new Date() } }  
+    );
+
+    // Update user object as well
+    user.password = hashedPassword
+
+    console.log(`Password added for user ${user.username}`);
 }
 
-async function login(given_password: string,user: DbUser){
+async function login(user: DbUser, given_password?: string){
     let passwordIsValid = true;
 
-    if (user.password) {
+
+    if (given_password && user.password) {
         passwordIsValid = await bcrypt.compare(given_password, user.password);
-    } else {
-        passwordIsValid = false;
-    }
+    } 
 
     if (passwordIsValid) {
         const token = jwt.sign({ id: user._id }, SECRETKEY, { expiresIn: 86400 }); // 24 hours
         return { success: true, token: token };
     } else {
-        return { success: false };
+        return { success: false, token: null };
     }
 }
 
-interface AuthenticatedRequest extends Request {
-    userId?: string;
-  }
 
 
-  // MIDDLEWARE
-function authenticateToken(req: AuthenticatedRequest, res: Response, next: NextFunction) {
-    const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1];  // Authorization: Bearer TOKEN
-
-    if (token == null) return res.sendStatus(401); // if there's no token, return 401
-
-    jwt.verify(token, SECRETKEY, (err: jwt.VerifyErrors | null, decoded: any) => {
-        if (err) return res.sendStatus(403); // if the token has expired or is invalid, return 403
-
-        req.userId = decoded.userId; // Add the user ID to the request object
-        next(); // pass the execution off to whatever request the client intended
-    });
-}
 
 
 export default router;

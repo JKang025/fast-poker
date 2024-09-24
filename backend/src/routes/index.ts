@@ -1,5 +1,6 @@
 import express from 'express';
 import userRoutes from './userRoutes';
+import { hasUncaughtExceptionCaptureCallback } from 'process';
 
 const router = express.Router();
 
@@ -7,3 +8,5 @@ const router = express.Router();
 router.use('/users', userRoutes);
 
 export default router;
+
+
