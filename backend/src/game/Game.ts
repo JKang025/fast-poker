@@ -1,5 +1,3 @@
-// Game.ts
-
 import { Deck } from './models/Deck';
 import { Player } from './models/Player';
 import { Card } from './models/Card';
