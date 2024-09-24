@@ -210,11 +210,16 @@ export class Game {
         isActive: player.isActive,
         hasFolded: player.hasFolded,
         currentBet: player.currentBet,
-        hand: player.hand, 
+        hand: player.hand,
       })),
       communityCards: this.communityCards,
       pot: this.pot,
       state: this.state,
+      currentTurn: {
+        playerId: this.players[this.currentTurnIndex].id,
+        username: this.players[this.currentTurnIndex].username,
+        position: this.currentTurnIndex, // Optional: Player's position in the turn order
+      },
     };
   }
 
