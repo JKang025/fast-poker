@@ -1,25 +1,30 @@
 {
   "name": "backend",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "Backend for your web application",
+  "main": "dist/app.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node dist/app.js",
-    "dev": "nodemon",
+    "dev": "nodemon src/app.ts",
     "build": "tsc"
   },
   "author": "",
   "license": "ISC",
   "dependencies": {
     "@types/socket.io": "^3.0.2",
+    "bcrypt": "^5.1.1",
     "express": "^4.19.2",
+    "jsonwebtoken": "^9.0.2",
+    "mongodb": "^6.7.0",
     "socket.io": "^4.8.0",
     "socket.io-client": "^4.8.0",
     "ws": "^8.18.0"
   },
   "devDependencies": {
+    "@types/bcrypt": "^5.0.2",
     "@types/express": "^4.17.21",
+    "@types/jsonwebtoken": "^9.0.7",
     "@types/node": "^20.14.6",
     "@types/ws": "^8.5.12",
     "nodemon": "^3.1.4",

@@ -1,3 +1,5 @@
+// Game.ts
+
 import { Deck } from './models/Deck';
 import { Player } from './models/Player';
 import { Card } from './models/Card';
@@ -15,10 +17,15 @@ export class Game {
   private state: GameState = 'WAITING';
   private currentBet: number = 0;
   private highestBet: number = 0;
+
   constructor(id: string) {
     this.id = id;
   }
 
+  /**
+   * Adds a player to the game.
+   * @param player The player to add.
+   */
   public addPlayer(player: Player) {
     if (this.state !== 'WAITING') {
       throw new Error('Cannot join a game in progress');
@@ -26,6 +33,9 @@ export class Game {
     this.players.push(player);
   }
 
+  /**
+   * Starts the game by initializing the first phase and dealing cards.
+   */
   public startGame() {
     if (this.players.length < 2) {
       throw new Error('Need at least two players to start the game');
@@ -36,8 +46,15 @@ export class Game {
 
     this.currentBet = 0;
     this.highestBet = 0;
+
+    // Initialize the first turn
+    this.currentTurnIndex = this.getNextActivePlayerIndex(-1); // Start from the first active player
+    this.notifyCurrentPlayerTurn();
   }
 
+  /**
+   * Deals two cards to each player.
+   */
   private dealCards() {
     for (const player of this.players) {
       player.hand = []; // Reset player's hand
@@ -45,6 +62,9 @@ export class Game {
     }
   }
 
+  /**
+   * Proceeds to the next phase of the game (e.g., FLOP, TURN, RIVER, SHOWDOWN).
+   */
   public proceedToNextPhase() {
     switch (this.state) {
       case 'PRE_FLOP':
@@ -62,23 +82,28 @@ export class Game {
       case 'RIVER':
         this.state = 'SHOWDOWN';
         this.determineWinner();
-        break;
+        return; // End the game after showdown
       default:
-        break;
+        return;
     }
+
     // Reset player bets for the next round
     this.resetPlayerBets();
     // Reset highest bet
     this.highestBet = 0;
-    // Reset current turn index
-    this.currentTurnIndex = 0;
     // Reset action states
     this.players.forEach(player => {
-      player.resetForNewRound()
+      player.resetForNewRound();
     });
-    // Proceed to the next betting round
+    // Initialize the next turn
+    this.currentTurnIndex = this.getNextActivePlayerIndex(-1); // Start from the first active player
+    this.notifyCurrentPlayerTurn();
   }
 
+  /**
+   * Deals a specified number of community cards.
+   * @param count Number of cards to deal.
+   */
   private dealCommunityCards(count: number) {
     for (let i = 0; i < count; i++) {
       const card = this.deck.drawCard();
@@ -88,12 +113,26 @@ export class Game {
     }
   }
 
+  /**
+   * Handles a player's action (fold, call, raise).
+   * @param playerId The ID of the player.
+   * @param actionType The type of action.
+   * @param amount The amount for a raise.
+   */
   public handlePlayerAction(playerId: string, actionType: 'fold' | 'call' | 'raise', amount?: number) {
     this.queueAction(async () => {
       const player = this.players.find(p => p.id === playerId);
       if (!player || !player.isActive || player.hasFolded) {
         throw new Error('Invalid or inactive player');
       }
+
+       // Retrieve the current turn player
+    const currentPlayer = this.getCurrentTurnPlayer();
+
+    // Check if currentPlayer is undefined or if it's not the player's turn
+    if (!currentPlayer || playerId !== currentPlayer.id) {
+      throw new Error("It's not your turn");
+    }
 
       switch (actionType) {
         case 'fold':
@@ -113,6 +152,9 @@ export class Game {
           throw new Error('Unknown action type');
       }
 
+      // Mark that the player has acted
+      player.hasActed = true;
+
       // Check if betting round is over
       if (this.isBettingRoundComplete()) {
         this.proceedToNextPhase();
@@ -122,6 +164,10 @@ export class Game {
     });
   }
 
+  /**
+   * Handles a call action by a player.
+   * @param player The player who is calling.
+   */
   private handleCall(player: Player) {
     const callAmount = this.highestBet - player.currentBet;
     if (player.chips < callAmount) {
@@ -133,6 +179,11 @@ export class Game {
     console.log(`${player.username} has called ${callAmount} chips.`);
   }
 
+  /**
+   * Handles a raise action by a player.
+   * @param player The player who is raising.
+   * @param amount The amount to raise.
+   */
   private handleRaise(player: Player, amount: number) {
     const totalRaise = (this.highestBet - player.currentBet) + amount;
     if (player.chips < totalRaise) {
@@ -151,27 +202,40 @@ export class Game {
     });
   }
 
+  /**
+   * Checks if the current betting round is complete.
+   * @returns True if the betting round is complete, else false.
+   */
   private isBettingRoundComplete(): boolean {
     // Betting round is complete if all active players have acted and no one can raise
     return this.players.filter(p => p.isActive && !p.hasFolded).every(p => p.hasActed && p.currentBet === this.highestBet);
   }
-  
+
+  /**
+   * Moves the turn to the next active player.
+   */
   private moveToNextPlayer() {
-    // Find the next player who is active and hasn't folded
-    let attempts = 0;
     const totalPlayers = this.players.length;
+    let attempts = 0;
+
     while (attempts < totalPlayers) {
       this.currentTurnIndex = (this.currentTurnIndex + 1) % totalPlayers;
       const currentPlayer = this.players[this.currentTurnIndex];
-      if (currentPlayer.isActive && !currentPlayer.hasFolded && !currentPlayer.hasActed) {
-        // Notify the current player to take action
+      if (currentPlayer.isActive && !currentPlayer.hasFolded) {
         console.log(`It's now ${currentPlayer.username}'s turn.`);
-        break;
+        this.notifyCurrentPlayerTurn();
+        return;
       }
       attempts++;
     }
+
+    // If all players have acted or folded, proceed to next phase
+    this.proceedToNextPhase();
   }
 
+  /**
+   * Resets the current bets of all players for the next betting round.
+   */
   private resetPlayerBets() {
     this.players.forEach(player => {
       player.currentBet = 0;
@@ -180,9 +244,17 @@ export class Game {
     this.pot = 0;
   }
 
+  /**
+   * Determines the winner(s) of the game and distributes the pot accordingly.
+   */
   private async determineWinner() {
     const activePlayers = this.players.filter(p => p.isActive && !p.hasFolded);
-    const winners = HandEvaluator.compareHands(activePlayers)
+    const winners = HandEvaluator.compareHands(activePlayers);
+
+    if (winners.length === 0) {
+      console.log('No winners could be determined.');
+      return;
+    }
 
     const share = Math.floor(this.pot / winners.length);
     winners.forEach(winner => {
@@ -198,9 +270,17 @@ export class Game {
     }
 
     this.state = 'FINISHED';
+    // Optionally, notify players that the game has finished
   }
 
+  /**
+   * Retrieves the current game state, including whose turn it is.
+   * @returns The current game state.
+   */
   public getGameState() {
+    // Safeguard: Ensure there is at least one player
+    const currentPlayer = this.getCurrentTurnPlayer();
+
     return {
       id: this.id,
       players: this.players.map(player => ({
@@ -215,24 +295,79 @@ export class Game {
       communityCards: this.communityCards,
       pot: this.pot,
       state: this.state,
-      currentTurn: {
-        playerId: this.players[this.currentTurnIndex].id,
-        username: this.players[this.currentTurnIndex].username,
-        position: this.currentTurnIndex, // Optional: Player's position in the turn order
-      },
+      currentTurn: currentPlayer
+        ? {
+            playerId: currentPlayer.id,
+            username: currentPlayer.username,
+            position: this.currentTurnIndex, // Player's position in the turn order
+          }
+        : null, // No current turn if no players are active
     };
   }
 
+  /**
+   * Retrieves the player whose turn it currently is.
+   * @returns The current player, or undefined if no active players.
+   */
+  private getCurrentTurnPlayer(): Player | undefined {
+    if (this.players.length === 0) return undefined;
+    return this.players[this.currentTurnIndex];
+  }
 
-  // handling concurrency
-  private actionQueue: Array<() => void> = [];
+  /**
+   * Finds the next active player index starting from a given index.
+   * @param startIndex The index to start searching from.
+   * @returns The index of the next active player.
+   */
+  private getNextActivePlayerIndex(startIndex: number): number {
+    const totalPlayers = this.players.length;
+    let index = startIndex;
+
+    for (let i = 0; i < totalPlayers; i++) {
+      index = (index + 1) % totalPlayers;
+      const player = this.players[index];
+      if (player.isActive && !player.hasFolded) {
+        return index;
+      }
+    }
+
+    // If no active players found, return -1
+    return -1;
+  }
+
+  /**
+   * Notifies all players about the current player's turn.
+   * This method should be connected to your event emission logic (e.g., Socket.IO).
+   * For demonstration purposes, it's represented as a console log.
+   */
+  private notifyCurrentPlayerTurn() {
+    const currentPlayer = this.getCurrentTurnPlayer();
+    if (currentPlayer) {
+      console.log(`It's now ${currentPlayer.username}'s turn.`);
+      // Here, you would emit an event to notify all clients about the turn change.
+      // For example:
+      // io.to(this.id).emit('turnChanged', { currentTurn: { playerId: currentPlayer.id, username: currentPlayer.username } });
+    } else {
+      console.log('No active players left to take a turn.');
+    }
+  }
+
+  // Handling concurrency
+  private actionQueue: Array<() => Promise<void>> = [];
   private isProcessing: boolean = false;
 
-  public queueAction(action: () => void) {
+  /**
+   * Queues an action to be processed sequentially to avoid race conditions.
+   * @param action The action to queue.
+   */
+  public queueAction(action: () => Promise<void>) {
     this.actionQueue.push(action);
     this.processQueue();
   }
 
+  /**
+   * Processes the action queue sequentially.
+   */
   private async processQueue() {
     if (this.isProcessing) return;
     this.isProcessing = true;
@@ -240,7 +375,11 @@ export class Game {
     while (this.actionQueue.length > 0) {
       const action = this.actionQueue.shift();
       if (action) {
-        await action();
+        try {
+          await action();
+        } catch (error) {
+          console.error('Error processing action:', error);
+        }
       }
     }
 
