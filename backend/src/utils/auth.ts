@@ -1,7 +1,9 @@
+import * as dotenv from 'dotenv';
+dotenv.config();
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 
-export const SECRETKEY = 'aggag1i32';
+const SECRETKEY: string = process.env.SECRETKEY || 'defaultSecretKey';
 
 export interface AuthenticatedRequest extends Request {
     userId?: string;

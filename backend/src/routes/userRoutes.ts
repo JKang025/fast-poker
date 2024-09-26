@@ -1,3 +1,6 @@
+import * as dotenv from 'dotenv';
+dotenv.config();
+
 import express, { Request, Response, NextFunction } from 'express';
 const router = express.Router();
 const { MongoClient, ServerApiVersion} = require("mongodb");
@@ -8,7 +11,7 @@ import bcrypt from 'bcrypt';
 
 
 const COLLECTIONNAME = "users";
-const SECRETKEY = 'aggag1i32'
+const SECRETKEY: string = process.env.SECRETKEY || 'defaultSecretKey';
 
 
 router.post('/login', async (req: Request, res: Response) => {
