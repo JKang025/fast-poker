@@ -8,17 +8,27 @@ import { SECRETKEY } from './utils/auth';
 import { GameManager } from './game/GameManager';
 import { Player } from './game/models/Player';
 import { SocketResponse } from './utils/SocketResponse';
+const cors = require('cors');
 
 const app = express();
 const PORT = 8080;
 
 app.use(express.json());
+
+app.use(cors({
+  origin: 'http://localhost:3000', // Allow requests from your frontend
+  methods: ['GET', 'POST'],        // Specify allowed HTTP methods
+  credentials: true,               // If you're using cookies or authentication
+}));
+
 app.use('/api', routes);
+
+
 
 const server = createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: '*', // Replace with your frontend origin
+    origin: 'http://localhost:3000', // Replace with your frontend origin
     methods: ['GET', 'POST'],
   },
 });
@@ -40,6 +50,7 @@ io.use((socket: Socket, next) => {
 
 io.on('connection', (socket: Socket) => {
   console.log(`User connected: ${socket.data.userId}`);
+  
 
   // Event: createGame
   socket.on('createGame', async (data: any, callback: (response: SocketResponse) => void) => {
