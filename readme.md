@@ -1,7 +1,7 @@
 # Fast-Poker
 
 ## Overview
-Minimalist poker webapp, built for easy poker sessions with the hassle of real-life poker chips
+Minimalist poker webapp, built for easy poker sessions without the hassle of real-life poker chips
 
 ## Setup
 Currently not hosted because this project is being updated.
