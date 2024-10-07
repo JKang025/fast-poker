@@ -4,10 +4,14 @@ import { createServer } from 'http';
 import { Server, Socket } from 'socket.io';
 import routes from './routes';
 import jwt from 'jsonwebtoken';
-import { SECRETKEY } from './utils/auth';
 import { GameManager } from './game/GameManager';
 import { Player } from './game/models/Player';
 import { SocketResponse } from './utils/SocketResponse';
+import * as dotenv from 'dotenv';
+dotenv.config();
+
+const SECRETKEY: string = process.env.SECRETKEY || 'defaultSecretKey';
+
 const cors = require('cors');
 
 const app = express();
@@ -53,20 +57,31 @@ io.on('connection', (socket: Socket) => {
   
 
   // Event: createGame
-  socket.on('createGame', async (data: any, callback: (response: SocketResponse) => void) => {
-    try {
-      const gameId = generateUniqueGameId();
-      GameManager.createGame(gameId);
-      callback({ success: true, gameId });
-    } catch (error: unknown) {
-      console.error(`Error in createGame handler:`, error);
-      if (error instanceof Error) {
-        callback({ success: false, message: error.message });
-      } else {
-        callback({ success: false, message: 'An unexpected error occurred.' });
+  socket.on(
+    'createGame',
+    async (
+      data: { /* any additional data if needed */ },
+      callback: (response: SocketResponse) => void
+    ) => {
+      try {
+        // Generate a unique game ID and create the game
+        const gameId = generateUniqueGameId();
+        GameManager.createGame(gameId);
+
+        console.log(`Game created with ID: ${gameId}`);
+
+        // Send a success response back to the creator with the game ID
+        callback({ success: true, gameId });
+      } catch (error: unknown) {
+        console.error(`Error in createGame handler:`, error);
+        if (error instanceof Error) {
+          callback({ success: false, message: error.message });
+        } else {
+          callback({ success: false, message: 'An unexpected error occurred.' });
+        }
       }
     }
-  });
+  );
 
   // Event: joinGame
   socket.on(
@@ -76,11 +91,36 @@ io.on('connection', (socket: Socket) => {
       callback: (response: SocketResponse) => void
     ) => {
       try {
+        console.log("why running!!")
+        if (!username) {
+          return callback({ success: false, message: 'Username is required to join a game.' });
+        }
+
+        const game = GameManager.getGame(gameId);
+        if (!game) {
+          return callback({ success: false, message: 'Game not found.' });
+        }
+
+        // Create a new player and add to the game
         const player = new Player(socket.data.userId, username, 1000); // Starting chips
         GameManager.addPlayerToGame(gameId, player);
+
+        // Join the socket to the game room
         socket.join(gameId);
-        io.to(gameId).emit('playerJoined', { playerId: player.id, username: player.username });
-        callback({ success: true });
+
+        // Notify all clients in the game room that a new player has joined
+        const players = game.getPlayers().map((p: Player) => ({
+          playerId: p.id,
+          username: p.username,
+        }));
+
+        console.log(`Player ${username} joined game ${gameId}`);
+        console.log(players);
+
+        io.to(gameId).emit('playerJoined', { players });
+
+        // Send a success response with the updated players list
+        callback({ success: true, players });
       } catch (error: unknown) {
         console.error(`Error in joinGame handler:`, error);
         if (error instanceof Error) {
@@ -91,6 +131,7 @@ io.on('connection', (socket: Socket) => {
       }
     }
   );
+
 
   // Event: startGame
   socket.on(
@@ -149,7 +190,7 @@ io.on('connection', (socket: Socket) => {
   // Event: disconnect
   socket.on('disconnect', () => {
     console.log(`User disconnected: ${socket.data.userId}`);
-    // Handle player disconnection logic
+    //TODO remove users when disconnected
   });
 
   // Global socket error handling

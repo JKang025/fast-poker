@@ -1,96 +1,105 @@
-import React, { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
-import { createSocket } from '../utils/socket';
+// frontend/src/pages/GamePage.tsx
+import React, { useEffect, useState, useRef } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { getSocket } from '../utils/socket';
 
-interface GameState {
-  players: Array<{ id: string; username: string; chips: number }>;
-  communityCards: string[];
-  pot: number;
-  currentTurn: string;
-  // Add other game state properties as needed
+interface Player {
+  playerId: string;
+  username: string;
 }
+
 
 const GamePage: React.FC = () => {
   const { gameId } = useParams<{ gameId: string }>();
-  const [socket, setSocket] = useState<any>(null);
-  const [gameState, setGameState] = useState<GameState | null>(null);
-  const [actionAmount, setActionAmount] = useState(0);
+  const navigate = useNavigate();
   const token = localStorage.getItem('token');
+  const username = localStorage.getItem('username');
+  const socket = token ? getSocket(token) : null;
+  const [players, setPlayers] = useState<Player[]>([]);
+  const hasJoinedRef = useRef(false);
 
+  const [gameState, setGameState] = useState<any>(null);
+
+
+  // join game upon component mounting
   useEffect(() => {
-    const newSocket = createSocket(token!);
-    setSocket(newSocket);
+    if (!socket) {
+      console.error('Socket is not connected.');
+      navigate('/lobby');
+      return;
+    }
 
-    newSocket.emit('joinGame', { gameId }, (response: any) => {
-      if (!response.success) {
-        alert(response.message);
+    if (!gameId) {
+      console.error('No gameId provided.');
+      navigate('/lobby');
+      return;
+    }
+
+    if (!username) {
+      console.error('Username not found.');
+      navigate('/lobby');
+      return;
+    }
+
+    // joining game ONCE when page is loaded
+    if (!hasJoinedRef.current) {
+      console.log('Emitting joinGame');
+      hasJoinedRef.current = true; 
+      socket.emit('joinGame', { gameId, username }, (response: any) => {
+          if (response.success) {
+            console.log(`Joined game ${gameId} successfully.`);
+            setPlayers(response.players || []);
+          } else {
+            console.error('Join game failed:', response.message);
+            navigate('/gg');
+          }
+        }
+      );
+    }
+
+    // EVENT RECIEVED: playerJoined
+    const handlePlayerJoined = (data: any) => {
+      if (data.players) {
+        setPlayers(data.players);
+        console.log('Players updated:', data.players);
       }
-    });
-
-    newSocket.on('gameUpdate', (state: GameState) => {
-      setGameState(state);
-    });
-
-    //TODO have a list of current players, and then add a start game button
-    //newSocket.on('playerJoined', )
-
-    return () => {
-      newSocket.disconnect();
     };
-  }, [gameId, token]);
 
-  const handleAction = (action: string) => {
-    socket.emit('playerAction', { gameId, action, amount: actionAmount }, (response: any) => {
-      if (!response.success) {
-        alert(response.message);
-      }
-    });
-  };
+    socket.on('playerJoined', handlePlayerJoined);
 
-  if (!gameState) {
-    return (
+  }, [socket, gameId, username, navigate]);
+
+
+
+
+  
+  if(gameState){ // game has started
+    return(<div></div>)
+
+
+
+
+  }else{  // waiting for game to start
+
+      return (
       <div>
-        Loading game... <br />
-        Game ID: {gameId}
+        <h1>Game ID: {gameId}</h1>
+        <h2>Players:</h2>
+        {players.length > 0 ? (
+          <ul>
+            {players.map((player) => (
+              <li key={player.playerId}>
+                {player.username} (ID: {player.playerId})
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p>No players have joined yet.</p>
+        )}
       </div>
     );
-}
-
-
-  return (
-    <div>
-      <h1>Game ID: {gameId}</h1>
-      <div>
-        <h2>Community Cards:</h2>
-        <p>{gameState.communityCards.join(', ')}</p>
-      </div>
-      <div>
-        <h2>Players:</h2>
-        <ul>
-          {gameState.players.map((player) => (
-            <li key={player.id}>
-              {player.username} - Chips: {player.chips}
-            </li>
-          ))}
-        </ul>
-      </div>
-      <div>
-        <h2>Pot: {gameState.pot}</h2>
-        <p>Current Turn: {gameState.currentTurn}</p>
-      </div>
-      <div>
-        <button onClick={() => handleAction('fold')}>Fold</button>
-        <button onClick={() => handleAction('call')}>Call</button>
-        <input
-          type="number"
-          value={actionAmount}
-          onChange={(e) => setActionAmount(parseInt(e.target.value))}
-          placeholder="Raise Amount"
-        />
-        <button onClick={() => handleAction('raise')}>Raise</button>
-      </div>
-    </div>
-  );
+  }
+  
 };
 
 export default GamePage;

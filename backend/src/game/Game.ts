@@ -31,6 +31,10 @@ export class Game {
     this.players.push(player);
   }
 
+  public getPlayers(){
+      return this.players
+  }
+
   /**
    * Starts the game by initializing the first phase and dealing cards.
    */
